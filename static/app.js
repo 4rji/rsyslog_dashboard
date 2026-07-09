@@ -16,27 +16,10 @@ const btnPause     = document.getElementById('btn-pause');
 const btnClear     = document.getElementById('btn-clear');
 const chkScroll    = document.getElementById('chk-autoscroll');
 const connStatus   = document.getElementById('conn-status');
-
-// ── Keywords ───────────────────────────────────────────────────────────────
-const KEYWORDS = ['failed', 'error', 'denied', 'accepted', 'sudo', 'ssh', 'root'];
+const btnDownload  = document.getElementById('btn-download-filtered');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function highlightLine(text) {
-  let html = escapeHtml(text);
-  for (const kw of KEYWORDS) {
-    const re = new RegExp(`(${kw})`, 'gi');
-    html = html.replace(re, `<span class="kw-${kw.toLowerCase()}">$1</span>`);
-  }
-  return html;
-}
+// escapeHtml / formatLine / enableTokenFilter live in format.js (shared with history)
 
 function lineMatchesFilter(line) {
   const term = searchInput.value.trim().toLowerCase();
@@ -47,7 +30,7 @@ function appendLineToDOM(rawLine) {
   if (!lineMatchesFilter(rawLine)) return;
   const div = document.createElement('div');
   div.className = 'log-line';
-  div.innerHTML = highlightLine(rawLine);
+  div.innerHTML = formatLine(rawLine);
   logOutput.appendChild(div);
   trimDOM();
   updateCounter();
@@ -130,3 +113,12 @@ btnClear.addEventListener('click', () => {
 });
 
 searchInput.addEventListener('input', rebuildDOM);
+
+btnDownload.addEventListener('click', () => {
+  const visible = allLines.filter(lineMatchesFilter);
+  if (!visible.length) return;
+  const today = new Date().toISOString().slice(0, 10);
+  downloadLines(visible, filteredFilename(today, searchInput.value));
+});
+
+enableTokenFilter(logOutput, searchInput);

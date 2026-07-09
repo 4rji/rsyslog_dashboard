@@ -24,6 +24,7 @@
       Auto-scroll
     </label>
     <input type="text" id="search-input" placeholder="Filter logs…" autocomplete="off">
+    <button id="btn-download-filtered" title="Download only the lines matching the current filter">Download filtered</button>
     <span id="counter">0 lines</span>
     <span id="conn-status" class="status-connecting">Connecting…</span>
   </div>
@@ -32,6 +33,7 @@
     <div id="log-output"></div>
   </div>
 
+  <script src="/static/format.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

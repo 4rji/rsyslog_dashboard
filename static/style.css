@@ -164,6 +164,24 @@ header a:hover {
   background: #242424;
 }
 
+/* ── Structured tokens (timestamp / host / IP / ID / user) ────── */
+.log-ts   { color: #6a737d; }
+.log-host { color: #c792ea; }
+.log-ip   { color: #4fc1ff; font-weight: 600; }
+.log-id   { color: #e5c07b; }
+.log-user { color: #98c379; font-weight: 600; }
+
+.tok {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.tok:hover {
+  background: #2e3b44;
+  outline: 1px solid #44586b;
+}
+
 /* ── Keyword highlighting ─────────────────────────────────────── */
 .kw-failed   { color: #ff6b6b; font-weight: bold; }
 .kw-error    { color: #ff6b6b; font-weight: bold; }

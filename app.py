@@ -119,7 +119,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.get("/stream")
@@ -163,8 +163,9 @@ async def history(request: Request):
     except FileNotFoundError:
         content = "(No logs saved today yet)"
     return templates.TemplateResponse(
+        request,
         "history.html",
-        {"request": request, "content": content, "date": today},
+        {"content": content, "date": today},
     )
 
 

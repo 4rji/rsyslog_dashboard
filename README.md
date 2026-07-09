@@ -2,39 +2,76 @@
 
 A lightweight web app for viewing rsyslog messages in real time. New log lines are streamed to connected browsers via Server-Sent Events. Each browser session starts empty and shows only logs that arrive after the page was opened.
 
-## What it does
+## Features
+
+### Backend
 
 - Follows `/var/log/lab-rsyslog.log` in real time (equivalent to `tail -n 0 -F`)
-- Pushes new lines to all connected browsers instantly via SSE
-- Each browser session keeps its own in-memory log list — refreshing the page resets it
+- Handles log rotation transparently (detects inode changes and truncation, reopens the file)
+- Pushes new lines to all connected browsers instantly via SSE (`/stream`)
 - Saves every new line to `./saved_logs/lab-rsyslog-YYYY-MM-DD.log` (one file per day)
 - Provides a `/history` page showing the full current day's saved log
 - Provides a `/download/today` endpoint to download today's saved log file
-- Highlights keywords: `failed`, `error`, `denied`, `accepted`, `sudo`, `ssh`, `root`
+
+### Live view UI (`/`)
+
+- **Pause / Resume** — freezes the display; lines received while paused are buffered and flushed on resume
+- **Clear** — empties the current session's log area
+- **Auto-scroll** toggle — follows the newest line as it arrives
+- **Filter box** — live text filter over the received lines (case-insensitive substring match); clearing the filter restores all lines
+- **Double-click to filter** — double-clicking a highlighted token (IP, session ID, username, hostname) or any word drops it into the filter box
+- **Download filtered** — downloads only the lines matching the current filter as a `.log` file (named after the filter term, e.g. `lab-rsyslog-2026-07-09-10.10.65.221.log`); with no filter it downloads the whole session
+- **Line counter** — number of lines currently displayed
+- **Connection status badge** — Connecting / Connected / Disconnected (SSE reconnects automatically)
+- **Structured coloring** — each line is parsed and its parts get their own color: timestamp (dim gray), hostname (purple), IPv4 addresses (blue), session IDs like `(ID d03716f428)` (yellow), usernames after `User` (green)
+- **Keyword highlighting** — colorizes `failed`, `error`, `denied`, `accepted`, `sudo`, `ssh`, `root`
+- Keeps at most 10,000 lines in memory per browser tab; older lines are dropped
+
+### History view UI (`/history`)
+
+- Shows the entire contents of today's saved log file (static snapshot; refresh for newer entries)
+- **Filter box** — same case-insensitive live filter as the live view, with a `shown / total lines` counter
+- **Double-click to filter** and **Download filtered** — same behavior as the live view, applied to today's full saved log
+- Link to download today's complete log file
 
 ## rsyslog Configuration
 
-Add a rule to `/etc/rsyslog.d/99-lab.conf` (or directly to `/etc/rsyslog.conf`) to write to the log file this app reads:
-
-```
-# Write all syslog messages to the lab viewer file
-*.*    /var/log/lab-rsyslog.log
-```
-
-Or to capture only specific facilities:
-
-```
-local0.*    /var/log/lab-rsyslog.log
-auth,authpriv.*    /var/log/lab-rsyslog.log
-```
-
-After editing the rsyslog config:
+The recommended setup captures **all messages received from remote devices** (anything arriving over the network) while excluding the server's own local noise (systemd, cron, etc.):
 
 ```bash
+sudo tee /etc/rsyslog.d/30-lab-dashboard.conf <<'EOF'
+if $fromhost-ip != '127.0.0.1' then {
+    action(type="omfile"
+           file="/var/log/lab-rsyslog.log"
+           fileCreateMode="0644"
+           fileOwner="syslog"
+           fileGroup="adm")
+}
+EOF
 sudo systemctl restart rsyslog
-sudo touch /var/log/lab-rsyslog.log
-sudo chmod 644 /var/log/lab-rsyslog.log
 ```
+
+Local messages originate from `127.0.0.1`, so this filter matches only remote traffic. `fileCreateMode="0644"` makes the file world-readable so the dashboard can follow it without extra permissions.
+
+Variants:
+
+```
+# Only one specific device, by the hostname it reports:
+if $hostname == '00409DDE26B5' then { action(...) }
+
+# Only one specific device, by source IP (more reliable than hostname):
+if $fromhost-ip == '10.10.65.1' then { action(...) }
+
+# Absolutely everything, including the server's own local logs:
+*.* action(type="omfile" file="/var/log/lab-rsyslog.log" fileCreateMode="0644")
+```
+
+Notes:
+
+- rsyslog only creates the file **when the first matching message arrives**. Use `sudo tail -F /var/log/lab-rsyslog.log` (capital `-F`) to wait for it to appear.
+- Validate the config with `sudo rsyslogd -N1`.
+- **Start rsyslog before the dashboard** (or make sure the file already exists with rsyslog-compatible ownership). If the dashboard starts first it creates an empty file owned by its own user, and rsyslog (running as the `syslog` user) will not be able to write to it. If that happens, `sudo rm /var/log/lab-rsyslog.log` and restart rsyslog.
+- Do **not** replace the file with a symlink to `/var/log/syslog` — that file is `root:adm 640`, so the dashboard would not be able to read it.
 
 ## Installation
 
@@ -100,19 +137,20 @@ sudo journalctl -u rsyslog-live-viewer -f
 
 > **Note:** The service runs as `www-data` with `SupplementaryGroups=adm syslog` so it can read `/var/log/lab-rsyslog.log`. If your log file has different permissions, adjust the group accordingly.
 
-## Accessing the app
+## Endpoints
 
 | URL | Description |
 |-----|-------------|
 | `http://<server-ip>:8080/` | Live viewer (starts empty) |
-| `http://<server-ip>:8080/history` | Today's full saved log |
+| `http://<server-ip>:8080/history` | Today's full saved log, with filter |
+| `http://<server-ip>:8080/stream` | SSE stream of new log lines (used by the live view) |
 | `http://<server-ip>:8080/download/today` | Download today's log file |
 
 ## Live view vs history
 
 **Live view (`/`):** When you open this page, the log area is empty. You will only see log lines that arrive *after* you opened the page. If you refresh the page, your view resets and starts empty again. Each open browser tab maintains its own independent session.
 
-**History view (`/history`):** Shows the entire contents of today's saved log file. This page is allowed to show old logs because it is a separate historical view, not a live session.
+**History view (`/history`):** Shows the entire contents of today's saved log file, so it includes lines received before you opened the page. It is a static snapshot — refresh to see newer entries.
 
 ## Saved logs
 
@@ -122,19 +160,20 @@ Every log line received by the app is appended to:
 ./saved_logs/lab-rsyslog-YYYY-MM-DD.log
 ```
 
-One file is created per day. The `saved_logs/` directory is created automatically on startup. Files are retained indefinitely — add a cron job or logrotate rule if you need automatic cleanup.
+One file is created per day. The `saved_logs/` directory is created automatically on startup. Files are **retained indefinitely** — the history page only displays today's file, but previous days remain on disk. Add a cron job or logrotate rule if you need automatic cleanup.
 
 ## File structure
 
 ```
 rsyslog-live-viewer/
-├── app.py                          # FastAPI backend
+├── app.py                          # FastAPI backend: file follower, SSE fan-out, daily archiving
 ├── templates/
 │   ├── index.html                  # Live viewer page
-│   └── history.html                # Historical log page
+│   └── history.html                # Historical log page (with client-side filter)
 ├── static/
-│   ├── style.css                   # Dark theme + keyword colors
-│   └── app.js                      # SSE client, controls, highlighting
+│   ├── style.css                   # Dark theme + token/keyword colors
+│   ├── format.js                   # Shared line parsing/coloring, dblclick-to-filter, filtered download
+│   └── app.js                      # SSE client, controls, filtering
 ├── saved_logs/                     # Auto-created; daily log archives
 ├── requirements.txt
 ├── README.md
