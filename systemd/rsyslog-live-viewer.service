@@ -1,0 +1,21 @@
+[Unit]
+Description=rsyslog Live Log Viewer (FastAPI/uvicorn)
+After=network.target rsyslog.service
+Wants=rsyslog.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/rsyslog-live-viewer
+ExecStart=/opt/rsyslog-live-viewer/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Give the service user read access to /var/log files on Ubuntu
+SupplementaryGroups=adm syslog
+
+[Install]
+WantedBy=multi-user.target
