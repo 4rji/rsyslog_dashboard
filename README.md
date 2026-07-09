@@ -2,6 +2,8 @@
 
 A lightweight web app for viewing rsyslog messages in real time. New log lines are streamed to connected browsers via Server-Sent Events. Each browser session starts empty and shows only logs that arrive after the page was opened.
 
+![Dashboard de la app](dashboard.webp)
+
 ## Features
 
 ### Backend
