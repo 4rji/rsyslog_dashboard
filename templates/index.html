@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rsyslog Live Viewer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>rsyslog Live Viewer</h1>
+    <nav>
+      <a href="/history">History (today)</a>
+      <span class="sep">|</span>
+      <a href="/download/today">Download today's log</a>
+    </nav>
+  </header>
+
+  <div id="toolbar">
+    <button id="btn-pause">Pause</button>
+    <button id="btn-clear">Clear</button>
+    <label class="toggle-label">
+      <input type="checkbox" id="chk-autoscroll" checked>
+      Auto-scroll
+    </label>
+    <input type="text" id="search-input" placeholder="Filter logs…" autocomplete="off">
+    <span id="counter">0 lines</span>
+    <span id="conn-status" class="status-connecting">Connecting…</span>
+  </div>
+
+  <div id="log-container">
+    <div id="log-output"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
