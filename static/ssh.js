@@ -31,6 +31,7 @@ const lineMatchesSshFilter = (line) => {
 
 const SSH_FORM_HISTORY_KEY = 'rsyslog-dashboard-ssh-form-history';
 const SSH_RECENT_VALUES_KEY = 'rsyslog-dashboard-ssh-recent-values';
+const SSH_ACTIVE_STAMP_KEY = 'rsyslog-dashboard-ssh-active-stamp';
 
 function readFormHistory() {
   try {
@@ -59,8 +60,43 @@ function persistCurrentFormValues() {
     host: document.getElementById('ssh-host').value.trim(),
     port: document.getElementById('ssh-port').value,
     username: document.getElementById('ssh-user').value.trim(),
+    password: sshPass.value,
     log_path: document.getElementById('ssh-path').value.trim(),
   });
+}
+
+function buildConnectionStamp(values) {
+  return JSON.stringify({
+    host: values.host.trim(),
+    port: Number(values.port),
+    username: values.username.trim(),
+    password: values.password,
+    log_path: values.log_path.trim(),
+  });
+}
+
+function readActiveStamp() {
+  try {
+    return localStorage.getItem(SSH_ACTIVE_STAMP_KEY);
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveActiveStamp(stamp) {
+  try {
+    localStorage.setItem(SSH_ACTIVE_STAMP_KEY, stamp);
+  } catch (_) {
+    /* ignore storage failures */
+  }
+}
+
+function clearActiveStamp() {
+  try {
+    localStorage.removeItem(SSH_ACTIVE_STAMP_KEY);
+  } catch (_) {
+    /* ignore storage failures */
+  }
 }
 
 function readRecentValues() {
@@ -137,6 +173,7 @@ sshPanel.push = (line) => {
 document.getElementById('ssh-host').value = loadSavedField('host', document.getElementById('ssh-host').value);
 document.getElementById('ssh-port').value = loadSavedField('port', document.getElementById('ssh-port').value);
 document.getElementById('ssh-user').value = loadSavedField('username', document.getElementById('ssh-user').value);
+sshPass.value = loadSavedField('password', sshPass.value);
 document.getElementById('ssh-path').value = loadSavedField('log_path', document.getElementById('ssh-path').value);
 
 const recentValues = readRecentValues();
@@ -144,7 +181,7 @@ renderDatalist(sshHostHistoryList, recentValues.host || []);
 renderDatalist(sshUserHistoryList, recentValues.user || []);
 renderDatalist(sshPathHistoryList, recentValues.path || []);
 
-['ssh-host', 'ssh-port', 'ssh-user', 'ssh-path'].forEach((id) => {
+['ssh-host', 'ssh-port', 'ssh-user', 'ssh-pass', 'ssh-path'].forEach((id) => {
   document.getElementById(id).addEventListener('input', persistCurrentFormValues);
 });
 
@@ -183,6 +220,14 @@ async function restoreActiveSession() {
     const res = await fetch('/ssh/session', { credentials: 'same-origin' });
     const data = await res.json();
     if (!data.active) return;
+    const currentStamp = buildConnectionStamp({
+      host: document.getElementById('ssh-host').value,
+      port: document.getElementById('ssh-port').value,
+      username: document.getElementById('ssh-user').value,
+      password: sshPass.value,
+      log_path: document.getElementById('ssh-path').value,
+    });
+    if (readActiveStamp() !== currentStamp) return;
     sshTarget.textContent = `— ${data.host} (${data.log_path})`;
     showForm(false);
     setSshStatus('connected', 'Connected');
@@ -217,11 +262,11 @@ sshForm.addEventListener('submit', async (event) => {
     if (!res.ok || !data.success) {
       throw new Error(data.error || 'Connection failed.');
     }
-    sshPass.value = '';                       // never keep the password in the DOM
     sshTarget.textContent = `— ${data.host} (${data.log_path})`;
     pushRecentValue('host', body.host);
     pushRecentValue('user', body.username);
     pushRecentValue('path', body.log_path);
+    saveActiveStamp(buildConnectionStamp(body));
     const updatedRecent = readRecentValues();
     renderDatalist(sshHostHistoryList, updatedRecent.host || []);
     renderDatalist(sshUserHistoryList, updatedRecent.user || []);
@@ -244,6 +289,7 @@ btnDisconnect.addEventListener('click', async () => {
   } catch (_) {
     /* ignore network errors while tearing down */
   }
+  clearActiveStamp();
   sshTarget.textContent = '';
   setSshStatus('connecting', 'Not connected');
   showForm(true);
