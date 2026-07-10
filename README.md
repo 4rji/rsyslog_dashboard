@@ -2,7 +2,21 @@
 
 A lightweight web app for viewing rsyslog messages in real time. New log lines are streamed to connected browsers via Server-Sent Events. Each browser session starts empty and shows only logs that arrive after the page was opened.
 
-![Dashboard de la app](dashboard.webp)
+![Application dashboard](dashboard.webp)
+
+---
+
+## Latest Update
+
+The dashboard now includes more filtering options, remote log viewing from any Linux system over SSH, filtered log export, colorized log highlighting, horizontal and vertical layouts, and an adjustable splitter bar for resizing the log panels.
+
+### Horizontal Layout
+
+![Horizontal rsyslog and SSH logs layout](horizontal.png)
+
+### Vertical Layout
+
+![Vertical rsyslog and SSH logs layout](vertical.png)
 
 ## Features
 
