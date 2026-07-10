@@ -200,6 +200,22 @@ header a:hover {
   color: #7ec8e3;
 }
 
+.download-btn {
+  background: linear-gradient(180deg, #2f7ea1 0%, #1f5e7d 100%);
+  border-color: #7ec8e3;
+  color: #e8faff;
+  font-weight: 600;
+}
+
+.download-btn:hover {
+  background: linear-gradient(180deg, #3794bb 0%, #246888 100%);
+  border-color: #9fe0f5;
+}
+
+.download-btn:active {
+  transform: translateY(1px);
+}
+
 .toggle-label {
   display: flex;
   align-items: center;
