@@ -6,15 +6,33 @@ from pathlib import Path
 
 import aiofiles
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from ssh_stream import SessionManager, SshError, parse_connection_request
+
 LOG_SOURCE = Path("/var/log/lab-rsyslog.log")
 SAVED_LOGS_DIR = Path("saved_logs")
+SSH_COOKIE = "ssh_session"
+
+# Shared headers for every Server-Sent Events response (local + remote).
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
 
 # Global set of per-client queues; all access happens in the same event loop thread
 active_queues: set[asyncio.Queue] = set()
+
+# Per-browser remote SSH sessions (see ssh_stream.py).
+session_manager = SessionManager()
 
 
 async def broadcast(line: str) -> None:
@@ -105,6 +123,7 @@ async def lifespan(app: FastAPI):
     SAVED_LOGS_DIR.mkdir(exist_ok=True)
     task = asyncio.create_task(file_follower())
     yield
+    await session_manager.close_all()
     task.cancel()
     try:
         await task
@@ -145,12 +164,88 @@ async def stream(request: Request):
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
+        headers=SSE_HEADERS,
     )
+
+
+# ── Remote SSH log viewer ────────────────────────────────────────────────────
+@app.post("/ssh/connect")
+async def ssh_connect(request: Request):
+    """Open (or replace) this browser's remote SSH session."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"success": False, "kind": "validation", "error": "Invalid request body."},
+            status_code=400,
+        )
+
+    try:
+        conn_request = parse_connection_request(data)
+        token = request.cookies.get(SSH_COOKIE)
+        new_token = await session_manager.connect(token, conn_request)
+    except SshError as exc:
+        status = {"validation": 400, "auth": 401, "timeout": 504}.get(exc.kind, 502)
+        return JSONResponse(
+            {"success": False, "kind": exc.kind, "error": exc.message},
+            status_code=status,
+        )
+
+    response = JSONResponse(
+        {"success": True, "host": conn_request.host, "log_path": conn_request.log_path}
+    )
+    response.set_cookie(SSH_COOKIE, new_token, httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/ssh/stream")
+async def ssh_stream(request: Request):
+    """Stream the remote tail output for this browser's session via SSE."""
+    token = request.cookies.get(SSH_COOKIE)
+    session = session_manager.get(token)
+
+    if session is None:
+        async def no_session():
+            yield "event: error\ndata: No active SSH session. Connect first.\n\n"
+
+        return StreamingResponse(
+            no_session(), media_type="text/event-stream", headers=SSE_HEADERS
+        )
+
+    queue = session.subscribe()
+
+    async def event_generator():
+        try:
+            yield "event: status\ndata: connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event, data = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    if event == "line":
+                        yield f"data: {data}\n\n"
+                    else:
+                        yield f"event: {event}\ndata: {data}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except (GeneratorExit, asyncio.CancelledError):
+            pass
+        finally:
+            session.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(), media_type="text/event-stream", headers=SSE_HEADERS
+    )
+
+
+@app.post("/ssh/disconnect")
+async def ssh_disconnect(request: Request):
+    """Close this browser's remote SSH session and clear its cookie."""
+    token = request.cookies.get(SSH_COOKIE)
+    await session_manager.disconnect(token)
+    response = JSONResponse({"success": True})
+    response.delete_cookie(SSH_COOKIE)
+    return response
 
 
 @app.get("/history", response_class=HTMLResponse)

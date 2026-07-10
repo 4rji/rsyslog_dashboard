@@ -3,37 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>rsyslog Live Viewer</title>
+  <title>syslog + SSH Logs</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header>
-    <h1>rsyslog Live Viewer</h1>
+    <h1>syslog + SSH Logs</h1>
     <nav>
-      <a href="/history">History (today)</a>
+      <a href="/history">Syslog History (today)</a>
       <span class="sep">|</span>
-      <a href="/download/today">Download today's log</a>
+      <a href="/download/today">Download today's syslog</a>
+      <span class="sep">|</span>
+      <span class="layout-toggle" aria-label="Layout orientation">
+        <button type="button" id="layout-horizontal" class="layout-btn">Horizontal</button>
+        <button type="button" id="layout-vertical" class="layout-btn">Vertical</button>
+      </span>
     </nav>
   </header>
 
-  <div id="toolbar">
-    <button id="btn-pause">Pause</button>
-    <button id="btn-clear">Clear</button>
-    <label class="toggle-label">
-      <input type="checkbox" id="chk-autoscroll" checked>
-      Auto-scroll
-    </label>
-    <input type="text" id="search-input" placeholder="Filter logs…" autocomplete="off">
-    <button id="btn-download-filtered" title="Download only the lines matching the current filter">Download filtered</button>
-    <span id="counter">0 lines</span>
-    <span id="conn-status" class="status-connecting">Connecting…</span>
-  </div>
+  <div id="split">
+    <!-- ── Local rsyslog panel ─────────────────────────────────────────── -->
+    <section class="panel" id="panel-local">
+      <div class="panel-head">
+        <span class="panel-title">Local syslog</span>
+        <button class="btn-max" data-target="panel-local">Maximize</button>
+      </div>
 
-  <div id="log-container">
-    <div id="log-output"></div>
+      <div class="panel-toolbar">
+        <button id="btn-pause">Pause</button>
+        <button id="btn-clear">Clear</button>
+        <label class="toggle-label">
+          <input type="checkbox" id="chk-autoscroll" checked>
+          Auto-scroll
+        </label>
+        <input type="text" id="search-input" placeholder="Filter logs…" autocomplete="off">
+        <button id="btn-download-filtered" title="Download only the lines matching the current filter">Download</button>
+        <span id="counter" class="counter">0 lines</span>
+        <span id="conn-status" class="status-connecting">Connecting…</span>
+      </div>
+
+      <div class="log-container" id="log-container">
+        <div class="log-output" id="log-output"></div>
+      </div>
+    </section>
+
+    <div id="splitter" title="Drag to resize"></div>
+
+    <!-- ── Remote SSH panel ────────────────────────────────────────────── -->
+    <section class="panel" id="panel-remote">
+      <div class="panel-head">
+        <span class="panel-title">Remote SSH logs <span id="ssh-target" class="panel-subtitle"></span></span>
+        <button class="btn-max" data-target="panel-remote">Maximize</button>
+      </div>
+
+      <form id="ssh-form" class="ssh-form" autocomplete="on">
+        <input id="ssh-host" name="ssh-host" placeholder="Host or IP address" list="ssh-host-history" autocomplete="on" required>
+        <input id="ssh-port" name="ssh-port" type="number" value="22" min="1" max="65535" title="SSH port" autocomplete="on" required>
+        <input id="ssh-user" name="ssh-user" placeholder="Username" list="ssh-user-history" autocomplete="on" required>
+        <input id="ssh-pass" name="ssh-pass" type="password" placeholder="Password" autocomplete="new-password" required>
+        <input id="ssh-path" name="ssh-path" value="/var/log/messages" list="ssh-path-history" title="Log file path" autocomplete="on" required>
+        <button type="submit" id="ssh-connect">Connect</button>
+        <span id="ssh-form-error" class="ssh-error"></span>
+        <datalist id="ssh-host-history"></datalist>
+        <datalist id="ssh-user-history"></datalist>
+        <datalist id="ssh-path-history"></datalist>
+      </form>
+
+      <div class="panel-toolbar" id="ssh-toolbar" hidden>
+        <button id="ssh-disconnect">Disconnect</button>
+        <button id="ssh-change" title="Change host settings and reconnect">Change host</button>
+        <button id="ssh-pause">Pause</button>
+        <button id="ssh-clear">Clear</button>
+        <label class="toggle-label">
+          <input type="checkbox" id="ssh-autoscroll" checked>
+          Auto-scroll
+        </label>
+        <input type="text" id="ssh-search" placeholder="Filter logs…" autocomplete="off">
+        <button id="ssh-download" title="Download only the lines matching the current filter">Download filtered</button>
+        <span id="ssh-counter" class="counter">0 lines</span>
+        <span id="ssh-status" class="status-connecting">Not connected</span>
+      </div>
+
+      <div class="log-container" id="ssh-container">
+        <div class="log-output" id="ssh-output"></div>
+      </div>
+    </section>
   </div>
 
   <script src="/static/format.js"></script>
+  <script src="/static/panel.js"></script>
+  <script src="/static/layout.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/ssh.js"></script>
 </body>
 </html>

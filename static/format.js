@@ -1,14 +1,39 @@
 'use strict';
 
-// Shared log-line formatting for the live view and the history page.
-// Recognized tokens (timestamp, hostname, IP, session ID, username) get their
-// own color; the clickable ones carry the .tok class and enableTokenFilter()
-// wires double-click on them to a search input.
+// Shared log-line formatting for the live views (local + remote SSH) and the
+// history page. Recognized tokens (timestamp, hostname, IP, session ID,
+// username) get their own color; the clickable ones carry the .tok class and
+// enableTokenFilter() wires double-click on them to a search input.
+//
+// Colors are applied purely for display — the original log text is never
+// altered, only wrapped in <span> elements in the browser.
 
-const KEYWORDS = ['failed', 'error', 'denied', 'accepted', 'sudo', 'ssh', 'root'];
+// Keyword categories → CSS class. Order matters: earlier rules win on overlap.
+const KEYWORD_RULES = [
+  ['kw-error', ['error', 'err', 'errors', 'failed', 'fail', 'failure', 'denied',
+                'deny', 'critical', 'fatal', 'panic', 'refused', 'unreachable',
+                'timeout', 'timed']],
+  ['kw-warn', ['warning', 'warn']],
+  ['kw-auth', ['authentication', 'authenticated', 'auth', 'login', 'logout',
+               'logged', 'password', 'sudo', 'sshd', 'ssh', 'session', 'pam',
+               'invalid', 'unauthorized']],
+  ['kw-net', ['interface', 'link', 'carrier', 'dhcp', 'dhclient', 'dhcpd',
+              'networkmanager', 'bridge', 'vlan', 'ppp', 'tunnel', 'route']],
+  ['kw-accepted', ['accepted', 'success', 'succeeded', 'established', 'connected']],
+  ['kw-root', ['root']],
+];
 
-// "2026-07-09T19:42:54-05:00 00409DDE26B5 " → timestamp + hostname prefix
+const KEYWORD_REGEXES = KEYWORD_RULES.map(
+  ([cls, words]) => [cls, new RegExp(`\\b(${words.join('|')})\\b`, 'gi')]
+);
+
+// ISO-8601 timestamp + hostname prefix (local rsyslog format).
+// "2026-07-09T19:42:54-05:00 00409DDE26B5 "
 const TS_HOST_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)\s+(\S+)\s+/;
+// Traditional syslog timestamp + hostname prefix (remote /var/log/messages).
+// "Jul  9 19:42:54 myhost "
+const SYSLOG_TS_HOST_RE = /^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+/;
+
 // IPv4 address | "(ID d03716f428)" | "User adminradius" (case-sensitive on purpose)
 const TOKEN_RE = /(\b\d{1,3}(?:\.\d{1,3}){3}\b)|\(ID ([^\s)]+)\)|\bUser (\S+)/g;
 const TOK_TITLE = 'title="Double-click to filter"';
@@ -23,9 +48,8 @@ function escapeHtml(text) {
 
 function highlightKeywords(text) {
   let html = escapeHtml(text);
-  for (const kw of KEYWORDS) {
-    const re = new RegExp(`\\b(${kw})\\b`, 'gi');
-    html = html.replace(re, `<span class="kw-${kw}">$1</span>`);
+  for (const [cls, re] of KEYWORD_REGEXES) {
+    html = html.replace(re, `<span class="${cls}">$1</span>`);
   }
   return html;
 }
@@ -34,7 +58,7 @@ function formatLine(raw) {
   let html = '';
   let rest = raw;
 
-  const head = raw.match(TS_HOST_RE);
+  const head = raw.match(TS_HOST_RE) || raw.match(SYSLOG_TS_HOST_RE);
   if (head) {
     html += `<span class="log-ts">${escapeHtml(head[1])}</span> `;
     html += `<span class="tok log-host" ${TOK_TITLE}>${escapeHtml(head[2])}</span> `;

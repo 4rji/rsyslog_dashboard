@@ -1,4 +1,4 @@
-# rsyslog Live Viewer
+# rsyslog + SSH Logs
 
 A lightweight web app for viewing rsyslog messages in real time. New log lines are streamed to connected browsers via Server-Sent Events. Each browser session starts empty and shows only logs that arrive after the page was opened.
 
@@ -35,6 +35,16 @@ A lightweight web app for viewing rsyslog messages in real time. New log lines a
 - **Filter box** — same case-insensitive live filter as the live view, with a `shown / total lines` counter
 - **Double-click to filter** and **Download filtered** — same behavior as the live view, applied to today's full saved log
 - Link to download today's complete log file
+
+### Remote SSH log viewer (`/`)
+
+The home page is split into two panels: **Local rsyslog** (left, everything above) and **Remote SSH logs** (right). The remote panel connects to another Linux or Digi device over SSH and streams `tail -F` of a log file, using the same SSE mechanism as the local view.
+
+- Enter **host/IP, SSH port, username, password**, and a **log file path** (defaults to `/var/log/messages`; change it to follow any other file), then **Connect**.
+- **Disconnect** closes the SSH connection; **Change host** reveals the form again to reconnect to a different device or path.
+- **Maximize / Restore** either panel, and **drag the divider** to resize them.
+- Auto-scroll (pause/resume), Pause, Clear, a line counter, and a connection-status badge (with connection/auth/timeout/disconnect errors), plus the same **filter box**, **Download filtered**, and **double-click to filter** as the local view.
+- The password is sent only in the connect request and held in memory for the active connection — never stored, logged, or returned. Each browser gets its own session (an HttpOnly cookie token); host keys are **not** verified (`known_hosts=None`), which suits a lab but offers no MITM protection.
 
 ## rsyslog Configuration
 
@@ -145,8 +155,11 @@ sudo journalctl -u rsyslog-live-viewer -f
 |-----|-------------|
 | `http://<server-ip>:8080/` | Live viewer (starts empty) |
 | `http://<server-ip>:8080/history` | Today's full saved log, with filter |
-| `http://<server-ip>:8080/stream` | SSE stream of new log lines (used by the live view) |
+| `http://<server-ip>:8080/stream` | SSE stream of new local log lines (used by the live view) |
 | `http://<server-ip>:8080/download/today` | Download today's log file |
+| `POST /ssh/connect` | Open/replace this browser's remote SSH session (host, port, username, password, log_path) |
+| `GET /ssh/stream` | SSE stream of the remote `tail -F` output for this browser's session |
+| `POST /ssh/disconnect` | Close this browser's remote SSH session |
 
 ## Live view vs history
 
@@ -168,14 +181,18 @@ One file is created per day. The `saved_logs/` directory is created automaticall
 
 ```
 rsyslog-live-viewer/
-├── app.py                          # FastAPI backend: file follower, SSE fan-out, daily archiving
+├── app.py                          # FastAPI backend: file follower, SSE fan-out, daily archiving, SSH routes
+├── ssh_stream.py                   # Remote SSH sessions: asyncssh connect + tail -F + per-browser fan-out
 ├── templates/
-│   ├── index.html                  # Live viewer page
+│   ├── index.html                  # Split-screen live viewer (local rsyslog + remote SSH)
 │   └── history.html                # Historical log page (with client-side filter)
 ├── static/
-│   ├── style.css                   # Dark theme + token/keyword colors
+│   ├── style.css                   # Dark theme + token/keyword colors + split layout
 │   ├── format.js                   # Shared line parsing/coloring, dblclick-to-filter, filtered download
-│   └── app.js                      # SSE client, controls, filtering
+│   ├── panel.js                    # Shared streaming log-panel factory (both viewers)
+│   ├── layout.js                   # Split-screen: draggable splitter + maximize/restore
+│   ├── app.js                      # Local rsyslog SSE client, controls, filtering
+│   └── ssh.js                      # Remote SSH connection form + SSE client
 ├── saved_logs/                     # Auto-created; daily log archives
 ├── requirements.txt
 ├── README.md

@@ -34,6 +34,10 @@ header h1 {
 
 header nav {
   font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 header a {
@@ -50,19 +54,128 @@ header a:hover {
   margin: 0 0.4rem;
 }
 
-/* ── Toolbar ──────────────────────────────────────────────────── */
-#toolbar {
-  display: flex;
-  gap: 0.6rem;
+.layout-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
   align-items: center;
-  padding: 0.4rem 1rem;
+}
+
+.layout-btn {
+  padding: 0.18rem 0.6rem;
+  cursor: pointer;
+  background: #3a3a3a;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.layout-btn:hover {
+  background: #4a4a4a;
+}
+
+.layout-btn.active {
+  background: #1e5c7a;
+  border-color: #7ec8e3;
+  color: #7ec8e3;
+}
+
+/* ── Split-screen layout ──────────────────────────────────────── */
+#split {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#split[data-orientation="vertical"] {
+  flex-direction: column;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#panel-remote {
+  border-left: 1px solid #333;
+}
+
+#split[data-orientation="vertical"] #panel-remote {
+  border-left: none;
+  border-top: 1px solid #333;
+}
+
+.panel.is-hidden,
+#splitter.is-hidden {
+  display: none;
+}
+
+.panel.is-max {
+  flex: 1 1 auto;
+}
+
+#splitter {
+  flex: 0 0 6px;
+  background: #333;
+  cursor: col-resize;
+}
+
+#split[data-orientation="vertical"] #splitter {
+  flex: 0 0 6px;
+  cursor: row-resize;
+}
+
+#splitter:hover {
+  background: #7ec8e3;
+}
+
+/* ── Panel header ─────────────────────────────────────────────── */
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0.75rem;
+  background: #181818;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7ec8e3;
+  letter-spacing: 0.02em;
+}
+
+.panel-subtitle {
+  color: #888;
+  font-weight: 400;
+  font-size: 0.72rem;
+}
+
+/* ── Toolbar (local #toolbar kept for history page) ───────────── */
+#toolbar,
+.panel-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
   background: #222;
   border-bottom: 1px solid #333;
   flex-shrink: 0;
   flex-wrap: wrap;
 }
 
-#toolbar button {
+#toolbar button,
+.panel-toolbar button,
+.btn-max,
+.ssh-form button {
   padding: 0.2rem 0.75rem;
   cursor: pointer;
   background: #3a3a3a;
@@ -73,11 +186,15 @@ header a:hover {
   transition: background 0.15s;
 }
 
-#toolbar button:hover {
+#toolbar button:hover,
+.panel-toolbar button:hover,
+.btn-max:hover,
+.ssh-form button:hover {
   background: #4a4a4a;
 }
 
-#toolbar button.active {
+#toolbar button.active,
+.panel-toolbar button.active {
   background: #1e5c7a;
   border-color: #7ec8e3;
   color: #7ec8e3;
@@ -92,9 +209,10 @@ header a:hover {
   user-select: none;
 }
 
-#search-input {
+#search-input,
+#ssh-search {
   flex: 1;
-  min-width: 160px;
+  min-width: 140px;
   max-width: 320px;
   padding: 0.2rem 0.5rem;
   background: #333;
@@ -105,10 +223,12 @@ header a:hover {
   outline: none;
 }
 
-#search-input:focus {
+#search-input:focus,
+#ssh-search:focus {
   border-color: #7ec8e3;
 }
 
+.counter,
 #counter {
   font-size: 0.75rem;
   color: #888;
@@ -116,8 +236,46 @@ header a:hover {
   margin-left: auto;
 }
 
+/* ── Remote SSH connection form ───────────────────────────────── */
+.ssh-form {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  background: #222;
+  border-bottom: 1px solid #333;
+  flex-wrap: wrap;
+}
+
+.ssh-form input {
+  padding: 0.2rem 0.5rem;
+  background: #333;
+  color: #e0e0e0;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.ssh-form input:focus {
+  border-color: #7ec8e3;
+}
+
+#ssh-host { flex: 1; min-width: 130px; }
+#ssh-port { width: 70px; }
+#ssh-user { width: 130px; }
+#ssh-pass { width: 130px; }
+#ssh-path { flex: 1; min-width: 160px; }
+
+.ssh-error {
+  color: #ff6b6b;
+  font-size: 0.75rem;
+  flex-basis: 100%;
+}
+
 /* ── Connection status badge ──────────────────────────────────── */
-#conn-status {
+#conn-status,
+#ssh-status {
   font-size: 0.7rem;
   padding: 0.1rem 0.5rem;
   border-radius: 10px;
@@ -139,14 +297,17 @@ header a:hover {
   color: #ff6b6b;
 }
 
-/* ── Log area ─────────────────────────────────────────────────── */
-#log-container {
+/* ── Log area (local #log-* kept for history page) ────────────── */
+#log-container,
+.log-container {
   flex: 1;
   overflow-y: auto;
   padding: 0;
+  min-height: 0;
 }
 
-#log-output {
+#log-output,
+.log-output {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
   font-size: 0.78rem;
   line-height: 1.55;
@@ -154,7 +315,7 @@ header a:hover {
 }
 
 .log-line {
-  padding: 1px 1rem;
+  padding: 1px 0.75rem;
   white-space: pre-wrap;
   word-break: break-all;
   border-bottom: 1px solid #1e1e1e;
@@ -183,13 +344,12 @@ header a:hover {
 }
 
 /* ── Keyword highlighting ─────────────────────────────────────── */
-.kw-failed   { color: #ff6b6b; font-weight: bold; }
-.kw-error    { color: #ff6b6b; font-weight: bold; }
-.kw-denied   { color: #ff9f43; font-weight: bold; }
-.kw-accepted { color: #55efc4; }
-.kw-sudo     { color: #fdcb6e; }
-.kw-ssh      { color: #74b9ff; }
-.kw-root     { color: #fd79a8; font-weight: bold; }
+.kw-error    { color: #ff6b6b; font-weight: bold; }  /* errors / failures */
+.kw-warn     { color: #fdcb6e; font-weight: bold; }  /* warnings */
+.kw-auth     { color: #e5b6ff; }                     /* authentication events */
+.kw-net      { color: #74b9ff; }                     /* interface / network events */
+.kw-accepted { color: #55efc4; }                     /* success / accepted */
+.kw-root     { color: #fd79a8; font-weight: bold; }  /* root */
 
 /* ── History page ─────────────────────────────────────────────── */
 #history-note {
@@ -199,4 +359,24 @@ header a:hover {
   font-size: 0.8rem;
   color: #888;
   flex-shrink: 0;
+}
+
+/* ── Narrow screens: keep controls usable on small displays ───── */
+@media (max-width: 800px) {
+  header {
+    gap: 0.5rem;
+  }
+  .panel {
+    flex: 1 1 50%;
+  }
+  #split[data-orientation="horizontal"] {
+    flex-direction: column;
+  }
+  #split[data-orientation="horizontal"] #splitter {
+    display: none;
+  }
+  #split[data-orientation="horizontal"] #panel-remote {
+    border-left: none;
+    border-top: 1px solid #333;
+  }
 }

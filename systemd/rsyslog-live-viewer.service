@@ -1,5 +1,5 @@
 [Unit]
-Description=rsyslog Live Log Viewer (FastAPI/uvicorn)
+Description=rsyslog + SSH Logs viewer (FastAPI/uvicorn)
 After=network.target rsyslog.service
 Wants=rsyslog.service
 

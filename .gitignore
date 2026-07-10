@@ -1,1 +1,7 @@
 .DS_Store
+.atl/.skill-registry.cache.json
+.atl/skill-registry.md
+__pycache__/app.cpython-313.pyc
+__pycache__/app.cpython-314.pyc
+__pycache__/ssh_stream.cpython-313.pyc
+__pycache__/ssh_stream.cpython-314.pyc

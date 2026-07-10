@@ -1,62 +1,51 @@
 'use strict';
 
-const MAX_LINES = 10000;
+// Local rsyslog panel: streams /stream (SSE) into the shared log panel and adds
+// the local-only extras (text filter, filtered download, token double-click).
 
-// ── State ──────────────────────────────────────────────────────────────────
-const allLines = [];
-let isPaused = false;
-const pauseBuffer = [];
+const searchInput = document.getElementById('search-input');
+const btnPause    = document.getElementById('btn-pause');
+const btnClear    = document.getElementById('btn-clear');
+const btnDownload = document.getElementById('btn-download-filtered');
+const connStatus  = document.getElementById('conn-status');
+const logOutput   = document.getElementById('log-output');
+const LOCAL_LOG_HISTORY_KEY = 'rsyslog-dashboard-local-log-history';
 
-// ── DOM refs ───────────────────────────────────────────────────────────────
-const logOutput    = document.getElementById('log-output');
-const logContainer = document.getElementById('log-container');
-const counter      = document.getElementById('counter');
-const searchInput  = document.getElementById('search-input');
-const btnPause     = document.getElementById('btn-pause');
-const btnClear     = document.getElementById('btn-clear');
-const chkScroll    = document.getElementById('chk-autoscroll');
-const connStatus   = document.getElementById('conn-status');
-const btnDownload  = document.getElementById('btn-download-filtered');
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-// escapeHtml / formatLine / enableTokenFilter live in format.js (shared with history)
-
-function lineMatchesFilter(line) {
-  const term = searchInput.value.trim().toLowerCase();
+const currentFilter = () => searchInput.value.trim().toLowerCase();
+const lineMatchesFilter = (line) => {
+  const term = currentFilter();
   return !term || line.toLowerCase().includes(term);
-}
+};
 
-function appendLineToDOM(rawLine) {
-  if (!lineMatchesFilter(rawLine)) return;
-  const div = document.createElement('div');
-  div.className = 'log-line';
-  div.innerHTML = formatLine(rawLine);
-  logOutput.appendChild(div);
-  trimDOM();
-  updateCounter();
-  if (chkScroll.checked) {
-    logContainer.scrollTop = logContainer.scrollHeight;
+function readLocalLogHistory() {
+  try {
+    const raw = sessionStorage.getItem(LOCAL_LOG_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    return [];
   }
 }
 
-function trimDOM() {
-  const lines = logOutput.children;
-  while (lines.length > MAX_LINES) {
-    logOutput.removeChild(lines[0]);
+function saveLocalLogHistory(lines) {
+  try {
+    sessionStorage.setItem(LOCAL_LOG_HISTORY_KEY, JSON.stringify(lines));
+  } catch (_) {
+    /* ignore storage failures */
   }
 }
 
-function updateCounter() {
-  const n = logOutput.children.length;
-  counter.textContent = `${n} line${n !== 1 ? 's' : ''}`;
-}
+const panel = createLogPanel({
+  output:     logOutput,
+  container:  document.getElementById('log-container'),
+  counter:    document.getElementById('counter'),
+  autoscroll: document.getElementById('chk-autoscroll'),
+  filter:     lineMatchesFilter,
+});
 
-function rebuildDOM() {
-  logOutput.innerHTML = '';
-  for (const line of allLines) {
-    appendLineToDOM(line);
-  }
+for (const line of readLocalLogHistory()) {
+  panel.push(line);
 }
+saveLocalLogHistory(panel.allLines);
 
 function setConnStatus(state) {
   connStatus.className = `status-${state}`;
@@ -64,58 +53,30 @@ function setConnStatus(state) {
   connStatus.textContent = labels[state] ?? state;
 }
 
-// ── SSE Connection ─────────────────────────────────────────────────────────
+// ── SSE connection ───────────────────────────────────────────────────────────
 const evtSource = new EventSource('/stream');
-
-evtSource.onopen = () => setConnStatus('connected');
-
+evtSource.onopen    = () => setConnStatus('connected');
 evtSource.onmessage = (event) => {
-  const line = event.data;
-  if (isPaused) {
-    pauseBuffer.push(line);
-    return;
-  }
-  if (allLines.length >= MAX_LINES) {
-    allLines.splice(0, Math.floor(MAX_LINES / 4));
-  }
-  allLines.push(line);
-  appendLineToDOM(line);
+  panel.push(event.data);
+  saveLocalLogHistory(panel.allLines);
 };
+evtSource.onerror   = () => setConnStatus('error');  // EventSource auto-reconnects
 
-evtSource.onerror = () => {
-  setConnStatus('error');
-  // EventSource reconnects automatically; status will flip back on next onopen
-};
-
-// ── Controls ───────────────────────────────────────────────────────────────
+// ── Controls ─────────────────────────────────────────────────────────────────
 btnPause.addEventListener('click', () => {
-  isPaused = !isPaused;
-  btnPause.textContent = isPaused ? 'Resume' : 'Pause';
-  btnPause.classList.toggle('active', isPaused);
-
-  if (!isPaused && pauseBuffer.length > 0) {
-    for (const line of pauseBuffer) {
-      if (allLines.length >= MAX_LINES) {
-        allLines.splice(0, Math.floor(MAX_LINES / 4));
-      }
-      allLines.push(line);
-      appendLineToDOM(line);
-    }
-    pauseBuffer.length = 0;
-  }
+  const paused = panel.togglePaused();
+  btnPause.textContent = paused ? 'Resume' : 'Pause';
+  btnPause.classList.toggle('active', paused);
 });
 
 btnClear.addEventListener('click', () => {
-  allLines.length = 0;
-  pauseBuffer.length = 0;
-  logOutput.innerHTML = '';
-  updateCounter();
+  panel.clear();
+  saveLocalLogHistory([]);
 });
-
-searchInput.addEventListener('input', rebuildDOM);
+searchInput.addEventListener('input', () => panel.rebuild());
 
 btnDownload.addEventListener('click', () => {
-  const visible = allLines.filter(lineMatchesFilter);
+  const visible = panel.allLines.filter(lineMatchesFilter);
   if (!visible.length) return;
   const today = new Date().toISOString().slice(0, 10);
   downloadLines(visible, filteredFilename(today, searchInput.value));
