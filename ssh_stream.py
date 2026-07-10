@@ -22,7 +22,7 @@ import asyncssh
 CONNECT_TIMEOUT = 15.0
 # Close a session this long after its last viewer disconnects, so a closed
 # browser does not leave an SSH connection running forever.
-IDLE_CLOSE_DELAY = 30.0
+IDLE_CLOSE_DELAY = 240.0
 # Bound each subscriber queue so a stalled client cannot grow memory unbounded.
 QUEUE_MAXSIZE = 1000
 DEFAULT_LOG_PATH = "/var/log/messages"
@@ -250,6 +250,15 @@ class SessionManager:
         if not token:
             return None
         return self._sessions.get(token)
+
+    def describe(self, token: str | None) -> dict[str, str] | None:
+        session = self.get(token)
+        if session is None:
+            return None
+        return {
+            "host": session.host,
+            "log_path": session.log_path,
+        }
 
     async def disconnect(self, token: str | None) -> None:
         if token:

@@ -238,6 +238,16 @@ async def ssh_stream(request: Request):
     )
 
 
+@app.get("/ssh/session")
+async def ssh_session(request: Request):
+    """Return the active SSH session metadata for this browser, if any."""
+    token = request.cookies.get(SSH_COOKIE)
+    session = session_manager.describe(token)
+    if session is None:
+        return JSONResponse({"active": False})
+    return JSONResponse({"active": True, **session})
+
+
 @app.post("/ssh/disconnect")
 async def ssh_disconnect(request: Request):
     """Close this browser's remote SSH session and clear its cookie."""

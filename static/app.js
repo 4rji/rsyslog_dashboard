@@ -7,7 +7,6 @@ const searchInput = document.getElementById('search-input');
 const btnPause    = document.getElementById('btn-pause');
 const btnClear    = document.getElementById('btn-clear');
 const btnDownload = document.getElementById('btn-download-filtered');
-const connStatus  = document.getElementById('conn-status');
 const logOutput   = document.getElementById('log-output');
 const LOCAL_LOG_HISTORY_KEY = 'rsyslog-dashboard-local-log-history';
 
@@ -40,6 +39,7 @@ const panel = createLogPanel({
   counter:    document.getElementById('counter'),
   autoscroll: document.getElementById('chk-autoscroll'),
   filter:     lineMatchesFilter,
+  counterLabel: (n) => `${n}`,
 });
 
 for (const line of readLocalLogHistory()) {
@@ -47,20 +47,13 @@ for (const line of readLocalLogHistory()) {
 }
 saveLocalLogHistory(panel.allLines);
 
-function setConnStatus(state) {
-  connStatus.className = `status-${state}`;
-  const labels = { connecting: 'Connecting…', connected: 'Connected', error: 'Disconnected' };
-  connStatus.textContent = labels[state] ?? state;
-}
-
 // ── SSE connection ───────────────────────────────────────────────────────────
 const evtSource = new EventSource('/stream');
-evtSource.onopen    = () => setConnStatus('connected');
 evtSource.onmessage = (event) => {
   panel.push(event.data);
   saveLocalLogHistory(panel.allLines);
 };
-evtSource.onerror   = () => setConnStatus('error');  // EventSource auto-reconnects
+evtSource.onerror   = () => {};  // EventSource auto-reconnects
 
 // ── Controls ─────────────────────────────────────────────────────────────────
 btnPause.addEventListener('click', () => {

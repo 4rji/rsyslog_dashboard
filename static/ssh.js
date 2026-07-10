@@ -178,6 +178,20 @@ function openStream() {
   sshEvtSource.onerror = () => setSshStatus('error');
 }
 
+async function restoreActiveSession() {
+  try {
+    const res = await fetch('/ssh/session', { credentials: 'same-origin' });
+    const data = await res.json();
+    if (!data.active) return;
+    sshTarget.textContent = `— ${data.host} (${data.log_path})`;
+    showForm(false);
+    setSshStatus('connected', 'Connected');
+    openStream();
+  } catch (_) {
+    /* no active session or session lookup failed */
+  }
+}
+
 sshForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   sshFormError.textContent = '';
@@ -261,3 +275,5 @@ btnDownloadSsh.addEventListener('click', () => {
 });
 
 enableTokenFilter(sshOutput, sshSearch);
+
+restoreActiveSession();

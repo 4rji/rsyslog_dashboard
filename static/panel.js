@@ -9,7 +9,8 @@
 const DEFAULT_MAX_LINES = 10000;
 
 function createLogPanel({ output, container, counter, autoscroll,
-                          maxLines = DEFAULT_MAX_LINES, filter = null }) {
+                          maxLines = DEFAULT_MAX_LINES, filter = null,
+                          counterLabel = null }) {
   const allLines = [];
   const pauseBuffer = [];
   let paused = false;
@@ -32,7 +33,7 @@ function createLogPanel({ output, container, counter, autoscroll,
 
   function updateCounter() {
     const n = output.children.length;
-    counter.textContent = `${n} line${n !== 1 ? 's' : ''}`;
+    counter.textContent = counterLabel ? counterLabel(n) : `${n} line${n !== 1 ? 's' : ''}`;
   }
 
   function record(line) {
